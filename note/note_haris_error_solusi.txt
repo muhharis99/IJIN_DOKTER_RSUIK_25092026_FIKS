@@ -1,0 +1,36 @@
+jika terjadi error :
+$ node server.js
+C:\xampp\htdocs\service_venom\node_modules\sharp\lib\sharp.js:114
+  throw new Error(help.join('\n'));
+  ^
+
+Error: Could not load the "sharp" module using the win32-x64 runtime
+Possible solutions:
+- Ensure optional dependencies can be installed:
+    npm install --include=optional sharp
+    yarn add sharp --ignore-engines
+- Ensure your package manager supports multi-platform installation:
+    See https://sharp.pixelplumbing.com/install#cross-platform
+- Add platform-specific dependencies:
+    npm install --os=win32 --cpu=x64 sharp
+- Consult the installation documentation:
+    See https://sharp.pixelplumbing.com/install
+    at Object.<anonymous> (C:\xampp\htdocs\service_venom\node_modules\sharp\lib\
+sharp.js:114:9)
+    at Module._compile (node:internal/modules/cjs/loader:1257:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1311:10)
+    at Module.load (node:internal/modules/cjs/loader:1115:32)
+    at Module._load (node:internal/modules/cjs/loader:962:12)
+    at Module.require (node:internal/modules/cjs/loader:1139:19)
+    at require (node:internal/modules/helpers:121:18)
+    at Object.<anonymous> (C:\xampp\htdocs\service_venom\node_modules\sharp\lib\
+constructor.js:10:1)
+    at Module._compile (node:internal/modules/cjs/loader:1257:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1311:10)
+
+Node.js v20.3.1
+
+Solusi :
+npm install --platform=win32 --arch=ia32 sharp
+rm -rf node_modules package-lock.json
+npm install

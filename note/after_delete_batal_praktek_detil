@@ -1,0 +1,7 @@
+CREATE TRIGGER after_delete_batal_praktek_detil
+AFTER DELETE ON batal_praktek_detil
+FOR EACH ROW
+BEGIN
+    DELETE FROM batal_praktek_detil_wa
+    WHERE id = OLD.id;
+END;

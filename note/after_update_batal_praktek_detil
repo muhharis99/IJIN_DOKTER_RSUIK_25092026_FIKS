@@ -1,0 +1,26 @@
+CREATE TRIGGER after_update_batal_praktek_detil
+AFTER UPDATE ON batal_praktek_detil
+FOR EACH ROW
+BEGIN
+    UPDATE batal_praktek_detil_wa
+    SET
+        id_daftar = NEW.id_daftar,
+        no_reg = NEW.no_reg,
+        no_hp = NEW.no_hp,
+        nama_pasien = NEW.nama_pasien,
+        no_antrian = NEW.no_antrian,
+        kode_poli = NEW.kode_poli,
+        nama_poli = NEW.nama_poli,
+        kode_dokter = NEW.kode_dokter,
+        nama_dokter = NEW.nama_dokter,
+        tgl_praktek = NEW.tgl_praktek,
+        jam_praktek = NEW.jam_praktek,
+        pesan = NEW.pesan,
+        status_kirim = NEW.status_kirim,
+        tgl_kirim_pesan = NEW.tgl_kirim_pesan,
+        tgl_terkirim_pesan = NEW.tgl_terkirim_pesan,
+        report_msg = NEW.report_msg,
+        log_report_msg = NEW.log_report_msg,
+        status = NEW.status
+    WHERE id = OLD.id;
+END;

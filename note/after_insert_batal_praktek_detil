@@ -1,0 +1,46 @@
+CREATE TRIGGER after_insert_batal_praktek_detil
+AFTER INSERT ON batal_praktek_detil
+FOR EACH ROW
+BEGIN
+    INSERT INTO batal_praktek_detil_wa (
+        id,
+        id_daftar,
+        no_reg,
+        no_hp,
+        nama_pasien,
+        no_antrian,
+        kode_poli,
+        nama_poli,
+        kode_dokter,
+        nama_dokter,
+        tgl_praktek,
+        jam_praktek,
+        pesan,
+        status_kirim,
+        tgl_kirim_pesan,
+        tgl_terkirim_pesan,
+        report_msg,
+        log_report_msg,
+        status
+    ) VALUES (
+        NEW.id,
+        NEW.id_daftar,
+        NEW.no_reg,
+        NEW.no_hp,
+        NEW.nama_pasien,
+        NEW.no_antrian,
+        NEW.kode_poli,
+        NEW.nama_poli,
+        NEW.kode_dokter,
+        NEW.nama_dokter,
+        NEW.tgl_praktek,
+        NEW.jam_praktek,
+        NEW.pesan,
+        NEW.status_kirim,
+        NEW.tgl_kirim_pesan,
+        NEW.tgl_terkirim_pesan,
+        NEW.report_msg,
+        NEW.log_report_msg,
+        NEW.status
+    );
+END;

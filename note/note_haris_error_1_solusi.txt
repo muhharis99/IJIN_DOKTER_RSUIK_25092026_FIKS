@@ -1,0 +1,59 @@
+node:events:496
+      throw er; // Unhandled 'error' event
+      ^
+
+Error: Connection lost: The server closed the connection.
+    at Protocol.end (C:\laragon\www\service_wa_with_venom\node_mod
+ules\mysql\lib\protocol\Protocol.js:112:13)
+    at Socket.<anonymous> (C:\laragon\www\service_wa_with_venom\no
+de_modules\mysql\lib\Connection.js:94:28)
+    at Socket.<anonymous> (C:\laragon\www\service_wa_with_venom\no
+de_modules\mysql\lib\Connection.js:526:10)
+    at Socket.emit (node:events:530:35)
+    at endReadableNT (node:internal/streams/readable:1696:12)
+    at process.processTicksAndRejections (node:internal/process/ta
+sk_queues:82:21)
+Emitted 'error' event on Connection instance at:
+    at Connection._handleProtocolError (C:\laragon\www\service_wa_
+with_venom\node_modules\mysql\lib\Connection.js:423:8)
+    at Protocol.emit (node:events:518:28)
+    at Protocol._delegateError (C:\laragon\www\service_wa_with_ven
+om\node_modules\mysql\lib\protocol\Protocol.js:398:10)
+    at Protocol.end (C:\laragon\www\service_wa_with_venom\node_mod
+ules\mysql\lib\protocol\Protocol.js:116:8)
+    at Socket.<anonymous> (C:\laragon\www\service_wa_with_venom\no
+de_modules\mysql\lib\Connection.js:94:28)
+    [... lines matching original stack trace ...]
+    at process.processTicksAndRejections (node:internal/process/ta
+sk_queues:82:21) {
+  fatal: true,
+  code: 'PROTOCOL_CONNECTION_LOST'
+}
+
+Node.js v20.11.1
+
+
+Solusi :
+konekkan ulang (server.js) :
+
+db.connect((err) => {
+  if (err) 
+  {
+    console.log('Error connecting to database:', err);
+    setTimeout(handleDisconnect, 2000);
+  } else 
+  {
+    console.log('Database connected!');
+  }
+});
+
+db.on('error', (err) => {
+  console.log('Database error:', err);
+  if (err.code === 'PROTOCOL_CONNECTION_LOST') 
+  {
+    handleDisconnect();
+  } else 
+  {
+    throw err;
+  }
+});

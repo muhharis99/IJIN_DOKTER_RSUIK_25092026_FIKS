@@ -1,0 +1,26 @@
+body {
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 16px;
+}
+
+.navbar {
+    background-color: #28a745;
+}
+
+.navbar .navbar-brand,
+.navbar .nav-link {
+    color: #ffffff;
+}
+
+.navbar .nav-link:hover {
+    color: #ffc107;
+}
+
+.sidebar-link {
+    color: white;
+    transition: color 0.3s;
+}
+
+.sidebar-link:hover {
+    color: black;
+}

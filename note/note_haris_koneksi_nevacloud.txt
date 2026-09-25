@@ -1,0 +1,5 @@
+Database NevaCloud
+
+hostname : 103.181.182.132:9969
+username : admin
+password  : @admin3dp
