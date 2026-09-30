@@ -151,7 +151,8 @@ function createPolicyStore(pool) {
     if (!noHp) return;
 
     const body = cleanBody(message.body);
-    await upsertInbound(noHp, message.body);
+    // Simpan timestamp inbound saja; jangan menyimpan isi chat pasien.
+    await upsertInbound(noHp, null);
 
     if (OPT_OUT_WORDS.has(body)) {
       await setOptOut(noHp, 'whatsapp_keyword:' + body);
