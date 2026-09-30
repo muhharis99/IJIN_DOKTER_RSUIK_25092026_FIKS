@@ -12,12 +12,12 @@ if (!$conn) {
 mysqli_set_charset($conn, 'utf8');
 
 $query = "
-    SELECT no_hp, pesan
+    SELECT id, no_hp, pesan
     FROM batal_praktek_detil_wa
     WHERE status IS NULL
       AND no_hp IS NOT NULL AND no_hp != ''
     UNION ALL
-    SELECT no_hp, pesan
+    SELECT id, no_hp, pesan
     FROM batal_praktek_detil_wa
     WHERE status = ''
       AND no_hp IS NOT NULL AND no_hp != ''
@@ -27,6 +27,7 @@ $result = mysqli_query($conn, $query);
 
 $data      = [];
 $allNumbers = [];
+$pendingIds = [];
 
 if ($result && mysqli_num_rows($result) > 0) {
     while ($row = mysqli_fetch_assoc($result)) {
@@ -36,11 +37,19 @@ if ($result && mysqli_num_rows($result) > 0) {
         $data[$row['pesan']][] = $hp;
 
         $allNumbers[$hp] = true;
+        $pendingIds[] = (int)$row['id'];
     }
 }
 
 $allNumbers    = array_keys($allNumbers);
 $totalPenerima = count($allNumbers);
+
+$pendingIds = array_values(array_unique(array_filter($pendingIds)));
+sort($pendingIds, SORT_NUMERIC);
+
+$eventKeySource = 'batal_praktek_detil_wa|';
+$eventKeySource .= implode(',', $pendingIds);
+$eventKey = hash('sha256', $eventKeySource);
 
 mysqli_close($conn);
 
@@ -415,6 +424,7 @@ $pesanFull = "📢 *Pengumuman RSU Islam Klaten*\n\n"
         </div>
         <div class="card-body-modern">
             <form id="whatsappForm">
+                <input type="hidden" id="eventKey" value="<?php echo htmlspecialchars($eventKey, ENT_QUOTES, 'UTF-8'); ?>">
                 <?php if (!empty($data)): ?>
 
                 <div class="mb-3">
