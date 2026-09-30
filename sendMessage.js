@@ -165,7 +165,7 @@ async function ensureConnected() {
   }
 }
 
-async function sendMessage(numbers, message) {
+async function sendMessage(numbers, message, eventKey = null) {
 
   if (!clientReady) {
     const connected = await ensureConnected();
@@ -214,7 +214,7 @@ async function sendMessage(numbers, message) {
         throw new Error('Policy guard belum terinisialisasi. Pengiriman dihentikan.');
       }
 
-      const guard = await policyStore.canSend(intl, message);
+      const guard = await policyStore.canSend(intl, message, eventKey);
 
       if (!guard.allowed) {
         console.warn(`🛡️ DITAHAN ${maskNumber(intl)}: ${guard.reason}`);
@@ -287,7 +287,7 @@ async function sendMessage(numbers, message) {
           // Logging tidak boleh membuat pesan yang sudah terkirim
           // dicoba ulang atau dianggap gagal.
           try {
-            await policyStore.recordOutbound(intl, message, 1, null);
+            await policyStore.recordOutbound(intl, message, 1, null, eventKey);
           } catch (logErr) {
             console.error('⚠️ Pesan sudah terkirim, tetapi log database gagal:', logErr.message);
           }
@@ -350,7 +350,7 @@ async function sendMessage(numbers, message) {
 
       if (policyStore) {
         try {
-          await policyStore.recordOutbound(intl, message, 2, err.message);
+          await policyStore.recordOutbound(intl, message, 2, err.message, eventKey);
         } catch (logErr) {
           console.error('❌ Gagal mencatat kegagalan pengiriman:', logErr.message);
         }
