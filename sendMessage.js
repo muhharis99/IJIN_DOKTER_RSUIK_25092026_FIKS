@@ -195,7 +195,7 @@ async function sendMessage(numbers, message) {
     const intl = normalizeNumber(originalNumber);
 
     if (!intl) {
-      console.error(`❌ Nomor tidak valid: ${originalNumber}`);
+      console.error(`❌ Nomor tidak valid: ${maskNumber(originalNumber)}`);
 
       results.push({
         number: originalNumber,
@@ -270,7 +270,7 @@ async function sendMessage(numbers, message) {
         try {
 
           console.log(
-            `📨 Attempt ${attempt}/2 -> ${intl}`
+            `📨 Attempt ${attempt}/2 -> ${maskNumber(intl)}`
           );
 
           // PENTING:
@@ -284,7 +284,13 @@ async function sendMessage(numbers, message) {
             `✅ BERHASIL terkirim ke ${maskNumber(intl)}`
           );
 
-          await policyStore.recordOutbound(intl, message, 1, null);
+          // Logging tidak boleh membuat pesan yang sudah terkirim
+          // dicoba ulang atau dianggap gagal.
+          try {
+            await policyStore.recordOutbound(intl, message, 1, null);
+          } catch (logErr) {
+            console.error('⚠️ Pesan sudah terkirim, tetapi log database gagal:', logErr.message);
+          }
 
           results.push({
             number: intl,
@@ -299,7 +305,7 @@ async function sendMessage(numbers, message) {
         } catch (err) {
 
           console.error(
-            `❌ Gagal attempt ${attempt} ke ${intl}:`,
+            `❌ Gagal attempt ${attempt} ke ${maskNumber(intl)}:`,
             err.message
           );
 
@@ -332,7 +338,7 @@ async function sendMessage(numbers, message) {
     } catch (err) {
 
       console.error(
-        `❌ FINAL ERROR ${originalNumber}:`,
+        `❌ FINAL ERROR ${maskNumber(originalNumber)}:`,
         err.message
       );
 
