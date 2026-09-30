@@ -404,6 +404,11 @@ $pesanFull = "📢 *Pengumuman RSU Islam Klaten*\n\n"
         <span>Jika terjadi kesalahan saat pengiriman, lakukan <strong>refresh halaman</strong> lalu kirim ulang. Pesan yang sudah berhasil terkirim sebelumnya <strong>sudah diterima pasien.</strong></span>
     </div>
 
+    <div class="info-banner warning">
+        <i class="bi bi-shield-check"></i>
+        <span><strong>Perlindungan kebijakan WhatsApp aktif:</strong> nomor yang belum memiliki persetujuan eksplisit untuk menerima notifikasi layanan akan otomatis ditahan. Penerima dapat berhenti menerima notifikasi dengan membalas <strong>STOP</strong>. Untuk mendaftar kembali, balas <strong>DAFTAR</strong>.</span>
+    </div>
+
     <div class="card-modern mt-3">
         <div class="card-header-modern">
             <i class="bi bi-send-fill"></i> Kirim Notifikasi ke Pasien
@@ -422,6 +427,7 @@ $pesanFull = "📢 *Pengumuman RSU Islam Klaten*\n\n"
                     <small class="text-muted" style="font-size:.78rem;">
                         <i class="bi bi-people"></i>
                         <?php echo $totalPenerima; ?> nomor penerima
+                        &nbsp;•&nbsp; pemeriksaan persetujuan dilakukan oleh gateway sebelum pengiriman
                     </small>
                 </div>
 
@@ -488,6 +494,9 @@ $pesanFull = "📢 *Pengumuman RSU Islam Klaten*\n\n"
                     <option value="">-- Semua Status --</option>
                     <option value="1">Terkirim</option>
                     <option value="2">Gagal Kirim</option>
+                    <option value="3">Ditahan Kebijakan</option>
+                    <option value="4">Opt-out</option>
+                    <option value="5">Duplikat</option>
                 </select>
             </div>
             <div class="col-md-3 col-sm-12 d-flex" style="gap:.5rem;">
