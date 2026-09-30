@@ -98,6 +98,7 @@ app.get('/health', async (req, res) => {
 app.post('/send', async (req, res) => {
   const numbers = String(req.body?.numbers || '').trim();
   const message = String(req.body?.message || '').trim();
+  const eventKey = String(req.body?.event_key || '').trim().slice(0, 128);
 
   if (!numbers || !message) {
     return res.status(400).json({
@@ -132,12 +133,14 @@ app.post('/send', async (req, res) => {
     console.log('========================================');
     console.log('Recipients:', numberList.length);
     console.log('Message length:', message.length);
+    console.log('Event key:', eventKey ? 'present' : 'legacy');
     console.log('Policy guard: ENABLED');
     console.log('========================================\n');
 
     const results = await sendMessage(
       numberList.join(','),
-      message
+      message,
+      eventKey || null
     );
 
     await Promise.all(
