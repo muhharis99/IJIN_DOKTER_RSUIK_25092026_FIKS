@@ -134,6 +134,12 @@ while ($row = mysqli_fetch_assoc($dataResult)) {
         $badge = "<span class='badge-status sent'><i class='bi bi-check-circle-fill'></i> Terkirim</span>";
     } elseif ($row['status'] == 2) {
         $badge = "<span class='badge-status failed'><i class='bi bi-x-circle-fill'></i> Gagal</span>";
+    } elseif ($row['status'] == 3) {
+        $badge = "<span class='badge-status unknown'><i class='bi bi-shield-exclamation'></i> Ditahan</span>";
+    } elseif ($row['status'] == 4) {
+        $badge = "<span class='badge-status failed'><i class='bi bi-person-slash'></i> Opt-out</span>";
+    } elseif ($row['status'] == 5) {
+        $badge = "<span class='badge-status unknown'><i class='bi bi-copy'></i> Duplikat</span>";
     } else {
         $badge = "<span class='badge-status unknown'><i class='bi bi-dash-circle'></i> N/A</span>";
     }
