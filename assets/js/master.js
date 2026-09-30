@@ -136,6 +136,7 @@ $(document).ready(function () {
 
         var numbers = $('#numbers').val().trim();
         var message = $('#message').val().trim();
+        var eventKey = $('#eventKey').val() || '';
 
         if (!numbers || !message) {
             Swal.fire({
@@ -185,7 +186,11 @@ $(document).ready(function () {
                 url:         'http://192.168.0.93:3000/send',
                 type:        'POST',
                 contentType: 'application/json',
-                data:        JSON.stringify({ numbers: numbers, message: message }),
+                data:        JSON.stringify({
+                    numbers: numbers,
+                    message: message,
+                    event_key: eventKey
+                }),
                 timeout:     600000,
                 success: function (sendResult) {
                     Swal.close();
