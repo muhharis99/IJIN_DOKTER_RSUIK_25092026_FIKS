@@ -6,6 +6,11 @@ const path = require('path');
 
 let clientReady = false;
 let initializing = false;
+let policyStore = null;
+
+function setPolicyStore(store) {
+  policyStore = store;
+}
 
 const AUTH_PATH = path.join(__dirname, '.wwebjs_auth');
 
@@ -98,6 +103,15 @@ client.on('change_state', (state) => {
   }
 });
 
+client.on('message', async (message) => {
+  if (!policyStore) return;
+  try {
+    await policyStore.recordInbound(message, client);
+  } catch (err) {
+    console.error('❌ Gagal memproses pesan masuk untuk policy guard:', err.message);
+  }
+});
+
 client.on('error', (err) => {
   console.error('❌ WhatsApp client error:', err.message);
 });
@@ -109,23 +123,17 @@ const delay = (ms) => {
 function normalizeNumber(number) {
   const n = String(number || '').replace(/\D/g, '');
 
-  if (!n) {
-    return null;
-  }
-
-  if (n.startsWith('0')) {
-    return '62' + n.slice(1);
-  }
-
-  if (n.startsWith('8')) {
-    return '62' + n;
-  }
-
-  if (n.startsWith('62')) {
-    return n;
-  }
-
+  if (!n) return null;
+  if (n.startsWith('0')) return '62' + n.slice(1);
+  if (n.startsWith('8')) return '62' + n;
+  if (n.startsWith('62')) return n;
   return n;
+}
+
+function maskNumber(number) {
+  return policyStore?.maskNumber
+    ? policyStore.maskNumber(number)
+    : ('****' + String(number || '').slice(-4));
 }
 
 async function ensureConnected() {
@@ -199,9 +207,26 @@ async function sendMessage(numbers, message) {
 
     const chatId = `${intl}@c.us`;
 
-    console.log(`\n📤 Mengirim ke: ${intl}`);
+    console.log(`\n📤 Memproses nomor: ${maskNumber(intl)}`);
 
     try {
+      if (!policyStore) {
+        throw new Error('Policy guard belum terinisialisasi. Pengiriman dihentikan.');
+      }
+
+      const guard = await policyStore.canSend(intl, message);
+
+      if (!guard.allowed) {
+        console.warn(`🛡️ DITAHAN ${maskNumber(intl)}: ${guard.reason}`);
+
+        results.push({
+          number: intl,
+          status: guard.status,
+          reason: guard.reason
+        });
+
+        continue;
+      }
 
       const connected = await ensureConnected();
 
@@ -256,12 +281,15 @@ async function sendMessage(numbers, message) {
           );
 
           console.log(
-            `✅ BERHASIL terkirim ke ${intl}`
+            `✅ BERHASIL terkirim ke ${maskNumber(intl)}`
           );
+
+          await policyStore.recordOutbound(intl, message, 1, null);
 
           results.push({
             number: intl,
-            status: 1
+            status: 1,
+            reason: 'sent'
           });
 
           sent = true;
@@ -310,8 +338,17 @@ async function sendMessage(numbers, message) {
 
       results.push({
         number: intl,
-        status: 2
+        status: 2,
+        reason: 'send_failed'
       });
+
+      if (policyStore) {
+        try {
+          await policyStore.recordOutbound(intl, message, 2, err.message);
+        } catch (logErr) {
+          console.error('❌ Gagal mencatat kegagalan pengiriman:', logErr.message);
+        }
+      }
     }
 
 
@@ -357,5 +394,6 @@ initializeClient();
 
 module.exports = {
   sendMessage,
-  client
+  client,
+  setPolicyStore
 };
