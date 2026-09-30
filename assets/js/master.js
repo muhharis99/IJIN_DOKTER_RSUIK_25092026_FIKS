@@ -196,13 +196,25 @@ $(document).ready(function () {
                         var gagal = sendResult.data
                             ? sendResult.data.filter(function (r) { return r.status === 2; }).length
                             : 0;
+                        var ditahan = sendResult.data
+                            ? sendResult.data.filter(function (r) { return r.status === 3; }).length
+                            : 0;
+                        var optout = sendResult.data
+                            ? sendResult.data.filter(function (r) { return r.status === 4; }).length
+                            : 0;
+                        var duplikat = sendResult.data
+                            ? sendResult.data.filter(function (r) { return r.status === 5; }).length
+                            : 0;
 
                         Swal.fire({
-                            icon:  gagal > 0 ? 'warning' : 'success',
-                            title: 'Pengiriman Selesai',
+                            icon:  gagal > 0 ? 'warning' : (berhasil > 0 ? 'success' : 'info'),
+                            title: 'Proses Selesai',
                             html:  '<p>✅ Berhasil: <strong>' + berhasil + '</strong> nomor</p>' +
                                    (gagal > 0 ? '<p>❌ Gagal: <strong>' + gagal + '</strong> nomor</p>' : '') +
-                                   '<small class="text-muted">Halaman akan dimuat ulang.</small>',
+                                   (ditahan > 0 ? '<p>🛡️ Ditahan: <strong>' + ditahan + '</strong> nomor</p>' : '') +
+                                   (optout > 0 ? '<p>🚫 Opt-out: <strong>' + optout + '</strong> nomor</p>' : '') +
+                                   (duplikat > 0 ? '<p>↩️ Duplikat: <strong>' + duplikat + '</strong> nomor</p>' : '') +
+                                   '<small class="text-muted">Nomor yang ditahan tidak dikirimi pesan.</small>',
                             allowOutsideClick: false,
                             allowEscapeKey:    false,
                             confirmButtonColor: '#0d6e4f',
