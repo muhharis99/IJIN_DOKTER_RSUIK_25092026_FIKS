@@ -74,14 +74,48 @@ function createPolicyStore(pool) {
         id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
         no_hp VARCHAR(32) NOT NULL,
         message_hash CHAR(64) NOT NULL,
+        event_key VARCHAR(128) NULL,
         status TINYINT NOT NULL,
         reason VARCHAR(160) NULL,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (id),
         KEY idx_wa_send_log_phone_time (no_hp, created_at),
-        KEY idx_wa_send_log_hash (no_hp, message_hash, created_at)
+        KEY idx_wa_send_log_hash (no_hp, message_hash, created_at),
+        KEY idx_wa_send_log_event (no_hp, message_hash, event_key, created_at)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
+
+    const columnRows = await query(
+      pool,
+      `SELECT COUNT(*) AS total
+         FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'wa_send_log'
+          AND COLUMN_NAME = 'event_key'`
+    );
+
+    if (Number(columnRows[0]?.total || 0) === 0) {
+      await query(pool, `
+        ALTER TABLE wa_send_log
+        ADD COLUMN event_key VARCHAR(128) NULL AFTER message_hash
+      `);
+    }
+
+    const indexRows = await query(
+      pool,
+      `SELECT COUNT(*) AS total
+         FROM information_schema.STATISTICS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'wa_send_log'
+          AND INDEX_NAME = 'idx_wa_send_log_event'`
+    );
+
+    if (Number(indexRows[0]?.total || 0) === 0) {
+      await query(pool, `
+        ALTER TABLE wa_send_log
+        ADD KEY idx_wa_send_log_event (no_hp, message_hash, event_key, created_at)
+      `);
+    }
   }
 
   async function getConsent(number) {
@@ -182,7 +216,7 @@ function createPolicyStore(pool) {
     }
   }
 
-  async function canSend(number, message) {
+  async function canSend(number, message, eventKey = null) {
     const noHp = normalizeNumber(number);
     if (!noHp) {
       return { allowed: false, status: 3, reason: 'invalid_number' };
@@ -219,17 +253,36 @@ function createPolicyStore(pool) {
       .update(String(message || ''), 'utf8')
       .digest('hex');
 
-    const duplicateRows = await query(
-      pool,
-      `SELECT id
-         FROM wa_send_log
-        WHERE no_hp = ?
-          AND message_hash = ?
-          AND status = 1
-          AND created_at >= DATE_SUB(NOW(), INTERVAL ? MINUTE)
-        LIMIT 1`,
-      [noHp, hash, DUPLICATE_WINDOW_MINUTES]
-    );
+    let duplicateRows;
+
+    if (eventKey) {
+      duplicateRows = await query(
+        pool,
+        `SELECT id
+           FROM wa_send_log
+          WHERE no_hp = ?
+            AND message_hash = ?
+            AND event_key = ?
+            AND status = 1
+            AND created_at >= DATE_SUB(NOW(), INTERVAL ? MINUTE)
+          LIMIT 1`,
+        [noHp, hash, String(eventKey).slice(0, 128), DUPLICATE_WINDOW_MINUTES]
+      );
+    } else {
+      // Backward compatibility: request lama tanpa event_key tetap
+      // memakai proteksi duplikasi berbasis isi pesan.
+      duplicateRows = await query(
+        pool,
+        `SELECT id
+           FROM wa_send_log
+          WHERE no_hp = ?
+            AND message_hash = ?
+            AND status = 1
+            AND created_at >= DATE_SUB(NOW(), INTERVAL ? MINUTE)
+          LIMIT 1`,
+        [noHp, hash, DUPLICATE_WINDOW_MINUTES]
+      );
+    }
 
     if (duplicateRows.length > 0) {
       return { allowed: false, status: 5, reason: 'duplicate_message_window' };
@@ -239,11 +292,12 @@ function createPolicyStore(pool) {
       allowed: true,
       status: 0,
       reason: null,
-      messageHash: hash
+      messageHash: hash,
+      eventKey: eventKey ? String(eventKey).slice(0, 128) : null
     };
   }
 
-  async function recordOutbound(number, message, status, reason = null) {
+  async function recordOutbound(number, message, status, reason = null, eventKey = null) {
     const noHp = normalizeNumber(number);
     if (!noHp) return;
 
@@ -255,9 +309,9 @@ function createPolicyStore(pool) {
     await query(
       pool,
       `INSERT INTO wa_send_log
-        (no_hp, message_hash, status, reason)
-       VALUES (?, ?, ?, ?)`,
-      [noHp, hash, Number(status), reason]
+        (no_hp, message_hash, event_key, status, reason)
+       VALUES (?, ?, ?, ?, ?)`,
+      [noHp, hash, eventKey ? String(eventKey).slice(0, 128) : null, Number(status), reason]
     );
 
     if (Number(status) === 1) {
