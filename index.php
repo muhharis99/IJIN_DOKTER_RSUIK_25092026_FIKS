@@ -13,8 +13,8 @@ mysqli_set_charset($conn, 'utf8');
 
 $query = "
     SELECT id, no_hp, pesan
-    FROM batal_praktek_detil_wa
-    WHERE (status IS NULL OR status = '' OR status IN (2, 3))
+    FROM rsiklaten.batal_praktek_detil_wa
+    WHERE (status IS NULL OR status = '')
       AND no_hp IS NOT NULL AND no_hp != ''
     ORDER BY id ASC
     LIMIT 5000";
