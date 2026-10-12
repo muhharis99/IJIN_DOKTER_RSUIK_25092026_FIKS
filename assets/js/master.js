@@ -320,7 +320,8 @@ $(document).ready(function () {
         else if (phase !== 'ready') metaParts.push('Versi WhatsApp Web: menunggu READY');
         meta.textContent = metaParts.join(' · ') || 'Menunggu informasi koneksi dari gateway.';
 
-        var hasProgress = status.loadingPercent !== null &&
+        var hasProgress = phase !== 'ready' &&
+            status.loadingPercent !== null &&
             status.loadingPercent !== undefined &&
             status.loadingPercent !== '' &&
             Number.isFinite(Number(status.loadingPercent));
