@@ -50,7 +50,11 @@ client.on('qr', async (qr) => {
 });
 
 client.on('authenticated', () => {
-  console.log('🔐 WhatsApp authenticated');
+  console.log('🔐 WhatsApp authenticated; menunggu sinkronisasi sesi dan event READY...');
+});
+
+client.on('loading_screen', (percent, message) => {
+  console.log(`⏳ WhatsApp loading: ${percent}%${message ? ' - ' + message : ''}`);
 });
 
 client.on('ready', async () => {
