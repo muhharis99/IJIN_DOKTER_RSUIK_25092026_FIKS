@@ -5,7 +5,8 @@ const cors = require('cors');
 
 const {
   sendMessage,
-  setPolicyStore
+  setPolicyStore,
+  getConnectionStatus
 } = require('./sendMessage');
 
 const {
@@ -65,6 +66,17 @@ function updateStatus(number, status) {
     );
   });
 }
+
+app.get('/status', (req, res) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+
+  return res.json({
+    success: true,
+    ...getConnectionStatus()
+  });
+});
 
 app.get('/health', async (req, res) => {
   try {
