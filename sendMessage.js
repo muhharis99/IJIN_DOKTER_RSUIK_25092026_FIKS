@@ -22,6 +22,52 @@ const connectionStatus = {
   events: []
 };
 
+function updateCompletedConnectionEventTypes() {
+  const loadingEvents = connectionStatus.events
+    .map(event => {
+      const match = String(event.label || '').match(/^WhatsApp loading:\s*(\d+(?:\.\d+)?)%/i);
+      return match ? { event, percent: Number(match[1]) } : null;
+    })
+    .filter(Boolean);
+
+  // Saat persentase bertambah, langkah loading yang lebih rendah sudah terlewati.
+  const currentPercent = Number(connectionStatus.loadingPercent);
+  if (Number.isFinite(currentPercent)) {
+    loadingEvents.forEach(({ event, percent }) => {
+      if (percent < currentPercent && event.type !== 'error') {
+        event.type = 'success';
+      }
+    });
+  }
+
+  // Setelah autentikasi berhasil, langkah QR tidak lagi menjadi proses yang tertunda.
+  if (connectionStatus.authenticated) {
+    connectionStatus.events.forEach(event => {
+      if (/^QR diterima; menunggu pemindaian\.$/.test(String(event.label || '')) && event.type !== 'error') {
+        event.type = 'success';
+      }
+    });
+  }
+
+  // READY berarti seluruh langkah koneksi yang sementara (kuning/biru) telah selesai.
+  // Peringatan nyata dan error (mis. gagal membaca versi atau status) tetap terlihat.
+  if (connectionStatus.ready || connectionStatus.phase === 'ready') {
+    const completedPatterns = [
+      /^QR diterima; menunggu pemindaian\.$/,
+      /^WhatsApp loading:/,
+      /^WhatsApp authenticated; menunggu sinkronisasi sesi dan event READY\.\.\.$/,
+      /^State berubah: CONNECTED$/
+    ];
+
+    connectionStatus.events.forEach(event => {
+      const label = String(event.label || '');
+      if (event.type !== 'error' && completedPatterns.some(pattern => pattern.test(label))) {
+        event.type = 'success';
+      }
+    });
+  }
+}
+
 function updateConnectionStatus(patch, eventLabel, type = 'info') {
   Object.assign(connectionStatus, patch, {
     updatedAt: new Date().toISOString()
@@ -35,6 +81,8 @@ function updateConnectionStatus(patch, eventLabel, type = 'info') {
     });
     connectionStatus.events = connectionStatus.events.slice(-12);
   }
+
+  updateCompletedConnectionEventTypes();
 }
 
 function getConnectionStatus() {
