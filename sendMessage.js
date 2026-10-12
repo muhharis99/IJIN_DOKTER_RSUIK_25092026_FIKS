@@ -6,6 +6,7 @@ const path = require('path');
 
 let clientReady = false;
 let initializing = false;
+let authTimeoutRecoveryInProgress = false;
 let policyStore = null;
 
 const connectionStatus = {
@@ -99,6 +100,8 @@ function setPolicyStore(store) {
 const AUTH_PATH = path.join(__dirname, '.wwebjs_auth');
 
 const client = new Client({
+  // WhatsApp Web lambat memuat versi kadang melewati batas bawaan 30 detik.
+  authTimeoutMs: 90000,
   authStrategy: new LocalAuth({
     dataPath: AUTH_PATH
   }),
@@ -114,6 +117,130 @@ const client = new Client({
   }
 
 });
+
+/**
+ * Memulihkan koneksi jika inject WhatsApp gagal karena auth timeout.
+ * Gunakan reload halaman dengan sesi LocalAuth yang sama agar tidak perlu scan QR
+ * selama sesi tersimpan masih valid.
+ */
+async function recoverAfterAuthTimeout(reason) {
+  if (authTimeoutRecoveryInProgress) return;
+
+  authTimeoutRecoveryInProgress = true;
+  clientReady = false;
+  updateConnectionStatus({
+    phase: 'syncing',
+    label: 'Halaman WhatsApp terlambat merespons; mencoba menyambungkan ulang otomatis...',
+    ready: false
+  }, 'Auth timeout terdeteksi; pemulihan otomatis dimulai.', 'warning');
+
+  try {
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        await delay(attempt * 3000);
+
+        const page = client.pupPage;
+        if (!page || page.isClosed()) {
+          throw new Error('Halaman browser WhatsApp tidak tersedia.');
+        }
+
+        console.warn('🔄 Pemulihan auth timeout, percobaan ' + attempt + '/3. Alasan:', String(reason || 'auth timeout'));
+
+        await page.reload({
+          waitUntil: 'domcontentloaded',
+          timeout: 60000
+        });
+
+        const deadline = Date.now() + 60000;
+        while (Date.now() < deadline) {
+          if (clientReady && connectionStatus.ready) {
+            console.log('✅ WhatsApp kembali READY setelah pemulihan otomatis.');
+            return;
+          }
+
+          if (!client.pupPage || client.pupPage.isClosed()) break;
+          await delay(1000);
+        }
+
+        throw new Error('Event READY tidak diterima dalam 60 detik setelah reload.');
+      } catch (retryError) {
+        console.error(
+          '⚠️ Pemulihan auth timeout percobaan ' + attempt + '/3 gagal:',
+          retryError && retryError.message ? retryError.message : String(retryError)
+        );
+
+        if (attempt < 3) {
+          updateConnectionStatus({
+            phase: 'syncing',
+            label: 'Menyambungkan ulang WhatsApp otomatis (' + (attempt + 1) + '/3)...',
+            ready: false
+          }, 'Percobaan pemulihan ' + attempt + ' gagal; mencoba lagi.', 'warning');
+        }
+      }
+    }
+
+    updateConnectionStatus({
+      phase: 'error',
+      label: 'WhatsApp belum berhasil tersambung kembali. Gateway tetap aktif; periksa koneksi internet dan sesi WhatsApp.',
+      ready: false
+    }, 'Pemulihan otomatis gagal setelah 3 percobaan.', 'error');
+  } finally {
+    authTimeoutRecoveryInProgress = false;
+  }
+}
+
+/**
+ * whatsapp-web.js menjalankan handler framenavigated secara async tanpa catch.
+ * Bungkus alur itu agar penolakan inject tidak menjadi unhandled rejection yang
+ * mematikan seluruh proses Node.js.
+ */
+client._registerFramenavigatedHandler = function () {
+  if (this._framenavigatedRegistered) return;
+  this._framenavigatedRegistered = true;
+
+  const activeClient = this;
+  this.pupPage.on('framenavigated', (frame) => {
+    Promise.resolve().then(async () => {
+      if (frame.parentFrame() !== null) return;
+
+      const isLogout =
+        frame.url().includes('post_logout=1') || activeClient.lastLoggedOut;
+
+      if (isLogout) {
+        activeClient.emit('disconnected', 'LOGOUT');
+        await activeClient.authStrategy.logout();
+        await activeClient.authStrategy.beforeBrowserInitialized();
+        await activeClient.authStrategy.afterBrowserInitialized();
+        activeClient.lastLoggedOut = false;
+      }
+
+      const storeAvailable = await activeClient.pupPage.evaluate(() => {
+        return typeof window.WWebJS !== 'undefined';
+      });
+
+      if (!isLogout && storeAvailable) return;
+      await activeClient.inject();
+    }).catch((err) => {
+      const errorMessage = typeof err === 'string'
+        ? err
+        : String(err && err.message ? err.message : err);
+      if (/auth timeout/i.test(errorMessage)) {
+        void recoverAfterAuthTimeout(errorMessage);
+        return;
+      }
+
+      console.error('❌ Gagal memproses navigasi halaman WhatsApp:', errorMessage);
+      updateConnectionStatus(
+        clientReady ? {} : {
+          phase: 'error',
+          label: 'Terjadi kendala saat memulihkan halaman WhatsApp.'
+        },
+        'Gagal memproses navigasi halaman WhatsApp: ' + errorMessage,
+        clientReady ? 'warning' : 'error'
+      );
+    });
+  });
+};
 
 client.on('qr', async (qr) => {
   updateConnectionStatus({
@@ -561,16 +688,20 @@ async function initializeClient() {
 
   } catch (err) {
 
+    const initializeErrorMessage = String(err && err.message ? err.message : err);
     console.error(
       '❌ Gagal initialize WhatsApp:',
-      err.message
+      initializeErrorMessage
     );
     updateConnectionStatus({
       phase: 'error',
-      label: 'Gagal memulai koneksi WhatsApp. Periksa log terminal.'
-    }, 'Gagal initialize WhatsApp: ' + String(err?.message || err), 'error');
+      label: 'Gagal memulai koneksi WhatsApp. Gateway akan mencoba memulihkan sesi jika terjadi auth timeout.'
+    }, 'Gagal initialize WhatsApp: ' + initializeErrorMessage, 'error');
 
     initializing = false;
+    if (/auth timeout/i.test(initializeErrorMessage)) {
+      void recoverAfterAuthTimeout(initializeErrorMessage);
+    }
   }
 }
 
