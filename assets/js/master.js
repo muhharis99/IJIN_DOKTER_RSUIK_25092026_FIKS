@@ -279,6 +279,152 @@ $(document).ready(function () {
         $('#cancelEdit').hide();
     });
 
+    var waStatusPollTimer = null;
+    var waStatusRequestInFlight = false;
+    var waStatusUrl = 'http://192.168.0.93:3000/status';
+
+    function renderWhatsAppConnectionStatus(status) {
+        var phase = String(status.phase || 'starting');
+        var phaseUi = {
+            starting:      { badge: 'MEMULAI', className: 'starting', icon: 'bi-hourglass-split text-muted' },
+            connecting:    { badge: 'MENGHUBUNGKAN', className: 'loading', icon: 'bi-arrow-repeat text-primary' },
+            qr_required:   { badge: 'MENUNGGU SCAN QR', className: 'warning', icon: 'bi-qr-code-scan text-warning' },
+            loading:       { badge: 'MEMUAT', className: 'loading', icon: 'bi-arrow-repeat text-primary' },
+            authenticated: { badge: 'AUTENTIKASI', className: 'syncing', icon: 'bi-shield-check text-warning' },
+            syncing:       { badge: 'SINKRONISASI', className: 'syncing', icon: 'bi-arrow-repeat text-warning' },
+            ready:         { badge: 'SIAP DIGUNAKAN', className: 'ready', icon: 'bi-check-circle-fill text-success' },
+            disconnected:  { badge: 'TERPUTUS', className: 'disconnected', icon: 'bi-wifi-off text-danger' },
+            error:         { badge: 'ERROR', className: 'error', icon: 'bi-exclamation-triangle-fill text-danger' }
+        };
+        var ui = phaseUi[phase] || phaseUi.starting;
+        var badge = document.getElementById('waStatusBadge');
+        var icon = document.getElementById('waStatusIcon');
+        var message = document.getElementById('waStatusMessage');
+        var meta = document.getElementById('waStatusMeta');
+        var progressWrap = document.getElementById('waProgressWrap');
+        var progressBar = document.getElementById('waProgressBar');
+        var progressText = document.getElementById('waProgressText');
+        var eventsList = document.getElementById('waConnectionEvents');
+        var updated = document.getElementById('waStatusUpdated');
+
+        if (!badge || !icon || !message || !meta || !eventsList) return;
+
+        badge.textContent = ui.badge;
+        badge.className = 'wa-status-badge ' + ui.className;
+        icon.className = 'bi ' + ui.icon;
+        message.textContent = status.label || 'Menunggu status koneksi WhatsApp...';
+
+        var metaParts = [];
+        if (status.state) metaParts.push('State: ' + status.state);
+        if (status.webVersion) metaParts.push('WhatsApp Web: ' + status.webVersion);
+        else if (phase !== 'ready') metaParts.push('Versi WhatsApp Web: menunggu READY');
+        meta.textContent = metaParts.join(' · ') || 'Menunggu informasi koneksi dari gateway.';
+
+        var hasProgress = phase !== 'ready' &&
+            status.loadingPercent !== null &&
+            status.loadingPercent !== undefined &&
+            status.loadingPercent !== '' &&
+            Number.isFinite(Number(status.loadingPercent));
+        if (progressWrap) {
+            progressWrap.style.display = hasProgress ? 'block' : 'none';
+        }
+        if (hasProgress && progressBar && progressText) {
+            var percent = Math.max(0, Math.min(100, Number(status.loadingPercent)));
+            progressBar.style.width = percent + '%';
+            progressText.textContent = 'Progres pemuatan WhatsApp: ' + percent + '%' +
+                (status.loadingMessage ? ' · ' + status.loadingMessage : '');
+        }
+
+        eventsList.textContent = '';
+        var events = Array.isArray(status.events) ? status.events : [];
+        if (!events.length) {
+            events = [{ label: message.textContent, type: phase === 'ready' ? 'success' : 'info', at: status.updatedAt }];
+        }
+        var eventIcons = {
+            success: 'bi-check-circle-fill text-success',
+            warning: 'bi-exclamation-circle-fill text-warning',
+            error: 'bi-x-circle-fill text-danger',
+            info: 'bi-info-circle-fill text-primary'
+        };
+
+        events.forEach(function (event) {
+            var li = document.createElement('li');
+            var time = document.createElement('span');
+            var eventIcon = document.createElement('i');
+            var label = document.createElement('span');
+            var date = event.at ? new Date(event.at) : null;
+
+            time.className = 'wa-status-event-time';
+            time.textContent = date && !Number.isNaN(date.getTime())
+                ? date.toLocaleTimeString('id-ID', { hour12: false })
+                : '--:--:--';
+            eventIcon.className = 'wa-status-event-icon bi ' +
+                (eventIcons[event.type] || eventIcons.info);
+            label.textContent = event.label || 'Status diperbarui';
+            li.appendChild(time);
+            li.appendChild(eventIcon);
+            li.appendChild(label);
+            eventsList.appendChild(li);
+        });
+
+        if (updated) {
+            var updateDate = status.updatedAt ? new Date(status.updatedAt) : null;
+            updated.textContent = updateDate && !Number.isNaN(updateDate.getTime())
+                ? 'Diperbarui ' + updateDate.toLocaleTimeString('id-ID', { hour12: false })
+                : '';
+        }
+    }
+
+    function loadWhatsAppConnectionStatus() {
+        if (waStatusRequestInFlight) return;
+        waStatusRequestInFlight = true;
+
+        $.ajax({
+            url: waStatusUrl,
+            method: 'GET',
+            dataType: 'json',
+            cache: false,
+            timeout: 5000
+        }).done(function (status) {
+            if (status && status.success) {
+                renderWhatsAppConnectionStatus(status);
+            } else {
+                showWhatsAppStatusUnavailable();
+            }
+        }).fail(function () {
+            showWhatsAppStatusUnavailable();
+        }).always(function () {
+            waStatusRequestInFlight = false;
+        });
+    }
+
+    function showWhatsAppStatusUnavailable() {
+        var badge = document.getElementById('waStatusBadge');
+        var icon = document.getElementById('waStatusIcon');
+        var message = document.getElementById('waStatusMessage');
+        var meta = document.getElementById('waStatusMeta');
+        if (badge) {
+            badge.textContent = 'GATEWAY TIDAK TERJANGKAU';
+            badge.className = 'wa-status-badge error';
+        }
+        if (icon) icon.className = 'bi bi-wifi-off text-danger';
+        if (message) message.textContent = 'Status koneksi belum bisa dibaca dari server gateway.';
+        if (meta) meta.textContent = 'Pastikan Node.js berjalan dan alamat gateway port 3000 dapat diakses.';
+    }
+
+    function startWhatsAppStatusPolling() {
+        stopWhatsAppStatusPolling();
+        loadWhatsAppConnectionStatus();
+        waStatusPollTimer = window.setInterval(loadWhatsAppConnectionStatus, 2000);
+    }
+
+    function stopWhatsAppStatusPolling() {
+        if (waStatusPollTimer) {
+            window.clearInterval(waStatusPollTimer);
+            waStatusPollTimer = null;
+        }
+    }
+
     document.getElementById('btnScanWA').addEventListener('click', function (e) {
         e.preventDefault();
         var qrUrl      = 'http://192.168.0.93:8049/service_wa_with_venom/qr_code.png';
@@ -295,6 +441,14 @@ $(document).ready(function () {
         };
 
         $('#qrModal').modal('show');
+    });
+
+    $('#qrModal').on('shown.bs.modal', function () {
+        startWhatsAppStatusPolling();
+    });
+
+    $('#qrModal').on('hidden.bs.modal', function () {
+        stopWhatsAppStatusPolling();
     });
 
     var btn = document.getElementById('backToTop');
