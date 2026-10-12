@@ -657,7 +657,7 @@ $pesanFull = "📢 *Pengumuman RSU Islam Klaten*\n\n"
 <script src="https://cdn.datatables.net/1.10.24/js/dataTables.bootstrap4.min.js"></script>
 <script src="https://cdn.datatables.net/responsive/2.2.9/js/dataTables.responsive.min.js" defer></script>
 <script src="https://cdn.datatables.net/responsive/2.2.9/js/responsive.bootstrap4.min.js" defer></script>
-<script src="./assets/js/master.js" defer></script>
+<script src="./assets/js/master.js?v=20261012-connection-status" defer></script>
 
 </body>
 </html>
