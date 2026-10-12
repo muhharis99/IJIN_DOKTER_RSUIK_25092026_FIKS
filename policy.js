@@ -47,7 +47,6 @@ function query(pool, sql, params = []) {
 
 function createPolicyStore(pool) {
   const MAX_DAILY_PER_NUMBER = Number(process.env.WA_MAX_DAILY_PER_NUMBER || 10);
-  const DUPLICATE_WINDOW_MINUTES = Number(process.env.WA_DUPLICATE_WINDOW_MINUTES || 360);
   const MAX_BATCH_SIZE = Number(process.env.WA_MAX_BATCH_SIZE || 500);
 
   async function ensureSchema() {
@@ -249,51 +248,13 @@ function createPolicyStore(pool) {
       return { allowed: false, status: 3, reason: 'daily_recipient_limit' };
     }
 
-    const hash = crypto
-      .createHash('sha256')
-      .update(String(message || ''), 'utf8')
-      .digest('hex');
-
-    let duplicateRows;
-
-    if (eventKey) {
-      duplicateRows = await query(
-        pool,
-        `SELECT id
-           FROM wa_send_log
-          WHERE no_hp = ?
-            AND message_hash = ?
-            AND event_key = ?
-            AND status = 1
-            AND created_at >= DATE_SUB(NOW(), INTERVAL ? MINUTE)
-          LIMIT 1`,
-        [noHp, hash, String(eventKey).slice(0, 128), DUPLICATE_WINDOW_MINUTES]
-      );
-    } else {
-      // Backward compatibility: request lama tanpa event_key tetap
-      // memakai proteksi duplikasi berbasis isi pesan.
-      duplicateRows = await query(
-        pool,
-        `SELECT id
-           FROM wa_send_log
-          WHERE no_hp = ?
-            AND message_hash = ?
-            AND status = 1
-            AND created_at >= DATE_SUB(NOW(), INTERVAL ? MINUTE)
-          LIMIT 1`,
-        [noHp, hash, DUPLICATE_WINDOW_MINUTES]
-      );
-    }
-
-    if (duplicateRows.length > 0) {
-      return { allowed: false, status: 5, reason: 'duplicate_message_window' };
-    }
-
+    // Repeated sends to the same number are allowed across requests.
+    // Keep event_key for audit logging; do not reject a send by matching
+    // message hash or a time-based duplicate window.
     return {
       allowed: true,
       status: 0,
       reason: null,
-      messageHash: hash,
       eventKey: eventKey ? String(eventKey).slice(0, 128) : null
     };
   }
