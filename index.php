@@ -344,6 +344,40 @@ $pesanFull = "📢 *Pengumuman RSU Islam Klaten*\n\n"
         .modal-header { background: linear-gradient(135deg, var(--primary), var(--primary-light)); color: #fff; border: none; }
         .modal-header .close { color: #fff; opacity: .8; }
         .modal-header .close:hover { opacity: 1; }
+        .wa-status-panel {
+            border: 1px solid var(--gray-200);
+            border-radius: 12px;
+            background: var(--gray-50);
+            padding: 1rem;
+            margin-top: 1.25rem;
+            text-align: left;
+        }
+        .wa-status-title { font-weight: 700; font-size: .9rem; }
+        .wa-status-message { font-size: .88rem; font-weight: 600; margin-top: .25rem; }
+        .wa-status-meta { display: block; color: var(--gray-600); font-size: .75rem; margin-top: .2rem; }
+        .wa-status-badge {
+            flex-shrink: 0;
+            display: inline-block;
+            border-radius: 999px;
+            padding: .3rem .55rem;
+            font-size: .65rem;
+            letter-spacing: .25px;
+            font-weight: 700;
+            background: var(--gray-100);
+            color: var(--gray-600);
+        }
+        .wa-status-badge.ready { background: #d1fae5; color: #065f46; }
+        .wa-status-badge.warning, .wa-status-badge.syncing { background: #fff8e1; color: #7a5c00; }
+        .wa-status-badge.error, .wa-status-badge.disconnected { background: #fee2e2; color: #991b1b; }
+        .wa-status-badge.loading, .wa-status-badge.starting { background: #e3f2fd; color: #0d47a1; }
+        .wa-status-progress { height: 8px; background: var(--gray-200); border-radius: 999px; overflow: hidden; }
+        .wa-status-progress-bar { height: 100%; width: 0; background: linear-gradient(90deg, var(--primary), var(--wa-green)); transition: width .35s ease; }
+        .wa-status-events { list-style: none; padding: 0; margin: .45rem 0 0; }
+        .wa-status-events li { display: flex; align-items: flex-start; gap: .5rem; padding: .38rem 0; border-bottom: 1px solid var(--gray-200); font-size: .76rem; line-height: 1.4; }
+        .wa-status-events li:last-child { border-bottom: 0; padding-bottom: 0; }
+        .wa-status-event-time { color: var(--gray-600); min-width: 62px; font-variant-numeric: tabular-nums; }
+        .wa-status-event-icon { width: 15px; flex-shrink: 0; }
+        .wa-status-updated { color: var(--gray-600); font-size: .68rem; }
         footer {
             background: linear-gradient(135deg, var(--primary) 0%, var(--wa-dark) 100%) !important;
             color: rgba(255,255,255,.85);
@@ -565,6 +599,37 @@ $pesanFull = "📢 *Pengumuman RSU Islam Klaten*\n\n"
                     <a class="btn btn-warning btn-sm" href="https://wa.me/62895376257021?text=Service%20WA%20perlu%20dijalankan%20" target="_blank">
                         <i class="bi bi-whatsapp"></i> Hubungi Admin
                     </a>
+                </div>
+
+                <div id="waConnectionPanel" class="wa-status-panel" role="status" aria-live="polite">
+                    <div class="d-flex align-items-start justify-content-between" style="gap:.75rem;">
+                        <div class="d-flex align-items-start" style="gap:.6rem;min-width:0;">
+                            <i id="waStatusIcon" class="bi bi-hourglass-split text-warning" style="font-size:1.2rem;margin-top:.1rem;"></i>
+                            <div>
+                                <div class="wa-status-title">Status Koneksi WhatsApp</div>
+                                <div id="waStatusMessage" class="wa-status-message">Memeriksa status gateway...</div>
+                                <small id="waStatusMeta" class="wa-status-meta">Menunggu informasi dari gateway.</small>
+                            </div>
+                        </div>
+                        <span id="waStatusBadge" class="wa-status-badge starting">MEMULAI</span>
+                    </div>
+
+                    <div id="waProgressWrap" class="mt-3" style="display:none;">
+                        <div class="wa-status-progress">
+                            <div id="waProgressBar" class="wa-status-progress-bar"></div>
+                        </div>
+                        <div id="waProgressText" class="wa-status-meta">0%</div>
+                    </div>
+
+                    <div class="mt-3">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <strong style="font-size:.78rem;">Riwayat Proses</strong>
+                            <small id="waStatusUpdated" class="wa-status-updated"></small>
+                        </div>
+                        <ul id="waConnectionEvents" class="wa-status-events">
+                            <li><span class="wa-status-event-time">--:--:--</span><i class="bi bi-hourglass-split wa-status-event-icon text-muted"></i><span>Menunggu event dari gateway...</span></li>
+                        </ul>
+                    </div>
                 </div>
             </div>
         </div>
