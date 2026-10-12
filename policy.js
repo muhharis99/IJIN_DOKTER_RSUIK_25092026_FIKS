@@ -224,12 +224,14 @@ function createPolicyStore(pool) {
 
     const consent = await getConsent(noHp);
 
-    if (!consent || Number(consent.service_opt_in) !== 1) {
-      return { allowed: false, status: 3, reason: 'no_explicit_opt_in' };
+    // Opt-out must take precedence over the default "not opted-in" state,
+    // so STOP requests are always reported as status 4 (Opt-out), never held.
+    if (consent && consent.service_opt_out_at) {
+      return { allowed: false, status: 4, reason: 'opted_out' };
     }
 
-    if (consent.service_opt_out_at) {
-      return { allowed: false, status: 4, reason: 'opted_out' };
+    if (!consent || Number(consent.service_opt_in) !== 1) {
+      return { allowed: false, status: 3, reason: 'no_explicit_opt_in' };
     }
 
     const dailyRows = await query(
