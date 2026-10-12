@@ -8,6 +8,42 @@ let clientReady = false;
 let initializing = false;
 let policyStore = null;
 
+const connectionStatus = {
+  phase: 'starting',
+  label: 'Memulai koneksi WhatsApp...',
+  state: 'UNKNOWN',
+  qrAvailable: false,
+  loadingPercent: null,
+  loadingMessage: '',
+  authenticated: false,
+  ready: false,
+  webVersion: null,
+  updatedAt: new Date().toISOString(),
+  events: []
+};
+
+function updateConnectionStatus(patch, eventLabel, type = 'info') {
+  Object.assign(connectionStatus, patch, {
+    updatedAt: new Date().toISOString()
+  });
+
+  if (eventLabel) {
+    connectionStatus.events.push({
+      label: eventLabel,
+      type,
+      at: new Date().toISOString()
+    });
+    connectionStatus.events = connectionStatus.events.slice(-12);
+  }
+}
+
+function getConnectionStatus() {
+  return {
+    ...connectionStatus,
+    events: connectionStatus.events.map(event => ({ ...event }))
+  };
+}
+
 function setPolicyStore(store) {
   policyStore = store;
 }
@@ -32,6 +68,16 @@ const client = new Client({
 });
 
 client.on('qr', async (qr) => {
+  updateConnectionStatus({
+    phase: 'qr_required',
+    label: 'QR tersedia. Silakan pindai menggunakan WhatsApp di HP.',
+    qrAvailable: true,
+    authenticated: false,
+    ready: false,
+    loadingPercent: null,
+    loadingMessage: ''
+  }, 'QR diterima; menunggu pemindaian.', 'warning');
+
   console.log('\n========================================');
   console.log('📸 SCAN QR WHATSAPP');
   console.log('========================================\n');
@@ -44,21 +90,55 @@ client.on('qr', async (qr) => {
     await QRCode.toFile(qrPath, qr);
 
     console.log(`🖼️ QR disimpan: ${qrPath}`);
+    updateConnectionStatus({
+      qrAvailable: true
+    }, 'QR berhasil dibuat dan disimpan.', 'success');
   } catch (err) {
     console.error('❌ Gagal menyimpan QR:', err.message);
+    updateConnectionStatus({
+      phase: 'error',
+      label: 'QR gagal disimpan. Periksa akses file qr_code.png.',
+      qrAvailable: false
+    }, 'Gagal menyimpan QR: ' + err.message, 'error');
   }
 });
 
 client.on('authenticated', () => {
+  updateConnectionStatus({
+    phase: 'authenticated',
+    label: 'Autentikasi berhasil; menunggu sinkronisasi sesi...',
+    authenticated: true,
+    ready: false
+  }, 'WhatsApp authenticated; menunggu sinkronisasi sesi dan event READY...', 'info');
+
   console.log('🔐 WhatsApp authenticated; menunggu sinkronisasi sesi dan event READY...');
 });
 
 client.on('loading_screen', (percent, message) => {
+  const progress = Number(percent);
+  updateConnectionStatus({
+    phase: connectionStatus.authenticated ? 'syncing' : 'loading',
+    label: connectionStatus.authenticated
+      ? 'Autentikasi berhasil; sinkronisasi WhatsApp sedang berlangsung...'
+      : 'WhatsApp sedang dimuat' + (Number.isFinite(progress) ? ': ' + progress + '%' : '...'),
+    loadingPercent: Number.isFinite(progress) ? progress : null,
+    loadingMessage: String(message || '')
+  }, 'WhatsApp loading: ' + (Number.isFinite(progress) ? progress + '%' : 'proses berjalan') + (message ? ' - ' + message : ''), 'info');
+
   console.log(`⏳ WhatsApp loading: ${percent}%${message ? ' - ' + message : ''}`);
 });
 
 client.on('ready', async () => {
   clientReady = true;
+  updateConnectionStatus({
+    phase: 'ready',
+    label: 'WhatsApp siap digunakan untuk mengirim pesan.',
+    authenticated: true,
+    ready: true,
+    state: 'CONNECTED',
+    qrAvailable: false,
+    loadingPercent: 100
+  }, 'WHATSAPP READY', 'success');
 
   console.log('\n========================================');
   console.log('🟢 WHATSAPP READY');
@@ -66,16 +146,24 @@ client.on('ready', async () => {
 
   try {
     const version = await client.getWWebVersion();
+    updateConnectionStatus({
+      webVersion: String(version || '')
+    }, 'WhatsApp Web Version: ' + String(version || 'tidak diketahui'), 'success');
     console.log('🌐 WhatsApp Web Version:', version);
   } catch (err) {
     console.warn('⚠️ Tidak dapat membaca WA Web version:', err.message);
+    updateConnectionStatus({}, 'Versi WhatsApp Web tidak dapat dibaca: ' + err.message, 'warning');
   }
 
   try {
     const state = await client.getState();
+    updateConnectionStatus({
+      state: String(state || 'UNKNOWN')
+    }, 'State: ' + String(state || 'UNKNOWN'), state === 'CONNECTED' ? 'success' : 'warning');
     console.log('🔍 State:', state);
   } catch (err) {
     console.warn('⚠️ Tidak dapat membaca state:', err.message);
+    updateConnectionStatus({}, 'Status koneksi tidak dapat dibaca: ' + err.message, 'warning');
   }
 
   console.log('========================================\n');
@@ -84,26 +172,53 @@ client.on('ready', async () => {
 client.on('auth_failure', (msg) => {
   console.error('❌ WhatsApp auth failure:', msg);
   clientReady = false;
+  updateConnectionStatus({
+    phase: 'error',
+    label: 'Autentikasi WhatsApp gagal. Periksa terminal dan coba sambungkan kembali.',
+    authenticated: false,
+    ready: false
+  }, 'WhatsApp auth failure: ' + String(msg || 'alasan tidak diketahui'), 'error');
 });
 
 client.on('disconnected', async (reason) => {
   console.warn('🔴 WhatsApp disconnected:', reason);
 
   clientReady = false;
-
+  updateConnectionStatus({
+    phase: 'disconnected',
+    label: 'WhatsApp terputus. Silakan tunggu koneksi pulih atau pindai QR jika diminta.',
+    authenticated: false,
+    ready: false,
+    state: 'DISCONNECTED',
+    qrAvailable: false
+  }, 'WhatsApp disconnected: ' + String(reason || 'alasan tidak diketahui'), 'error');
 });
 
 client.on('change_state', (state) => {
   console.log('🔄 WhatsApp state berubah:', state);
+  const disconnected = ['DISCONNECTED', 'UNPAIRED', 'UNPAIRED_IDLE'].includes(state);
 
-  if (state === 'CONNECTED') {
-    clientReady = true;
-  } else if (
-    state === 'DISCONNECTED' ||
-    state === 'UNPAIRED' ||
-    state === 'UNPAIRED_IDLE'
-  ) {
+  updateConnectionStatus({
+    state: String(state || 'UNKNOWN'),
+    ...(disconnected ? {
+      phase: state === 'DISCONNECTED' ? 'disconnected' : 'qr_required',
+      label: state === 'DISCONNECTED'
+        ? 'WhatsApp terputus.'
+        : 'WhatsApp belum tertaut. Pindai QR untuk menghubungkan perangkat.',
+      ready: false,
+      authenticated: false,
+      qrAvailable: state !== 'DISCONNECTED'
+    } : state === 'CONNECTED' && !connectionStatus.ready ? {
+      phase: 'syncing',
+      label: 'WhatsApp tersambung; menunggu proses sinkronisasi sampai READY...',
+      ready: false
+    } : {})
+  }, 'State berubah: ' + String(state || 'UNKNOWN'), disconnected ? 'warning' : 'info');
+
+  if (disconnected) {
     clientReady = false;
+  } else if (state === 'CONNECTED' && connectionStatus.ready) {
+    clientReady = true;
   }
 });
 
@@ -118,6 +233,14 @@ client.on('message', async (message) => {
 
 client.on('error', (err) => {
   console.error('❌ WhatsApp client error:', err.message);
+  if (!connectionStatus.ready) {
+    updateConnectionStatus({
+      phase: 'error',
+      label: 'Terjadi kendala saat menghubungkan WhatsApp. Detail tersedia di terminal.'
+    }, 'WhatsApp client error: ' + String(err?.message || err), 'error');
+  } else {
+    updateConnectionStatus({}, 'WhatsApp client error: ' + String(err?.message || err), 'warning');
+  }
 });
 
 const delay = (ms) => {
@@ -394,6 +517,10 @@ async function initializeClient() {
       '❌ Gagal initialize WhatsApp:',
       err.message
     );
+    updateConnectionStatus({
+      phase: 'error',
+      label: 'Gagal memulai koneksi WhatsApp. Periksa log terminal.'
+    }, 'Gagal initialize WhatsApp: ' + String(err?.message || err), 'error');
 
     initializing = false;
   }
@@ -405,5 +532,6 @@ initializeClient();
 module.exports = {
   sendMessage,
   client,
-  setPolicyStore
+  setPolicyStore,
+  getConnectionStatus
 };
