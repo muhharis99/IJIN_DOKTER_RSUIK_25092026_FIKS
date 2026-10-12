@@ -230,9 +230,8 @@ function createPolicyStore(pool) {
       return { allowed: false, status: 4, reason: 'opted_out' };
     }
 
-    if (!consent || Number(consent.service_opt_in) !== 1) {
-      return { allowed: false, status: 3, reason: 'no_explicit_opt_in' };
-    }
+    // Service notifications are sent without requiring the recipient to reply DAFTAR.
+    // Explicit STOP requests remain blocked by the opt-out check above.
 
     const dailyRows = await query(
       pool,
